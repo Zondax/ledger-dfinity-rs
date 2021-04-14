@@ -82,4 +82,31 @@ mod integration_tests {
             "5upke-tazvi-6ufqc-i3v6r-j4gpu-dpwti-obhal-yb5xj-ue32x-ktkql-rqe".to_string()
         );
     }
+
+
+    #[async_test]
+    async fn show_address() {
+        init_logging();
+
+        let transport = APDUTransport {
+            transport_wrapper: Box::new(ledger::TransportNativeHID::new().unwrap()),
+        };
+        let app = new_dfinity_app(transport);
+
+        let req = app
+            .get_address(&BIP44Path::from_string("m/44'/223'/0'/0/0").unwrap(), true)
+            .await;
+
+        let resp = req.unwrap();
+
+        assert_eq!(hex::encode(resp.public_key),"0410d34980a51af89d3331ad5fa80fe30d8868ad87526460b3b3e15596ee58e812422987d8589ba61098264df5bb9c2d3ff6fe061746b4b31a44ec26636632b835");
+        assert_eq!(
+            hex::encode(resp.address),
+            "19aa3d42c048dd7d14f0cfa0df69a1c1381780f6e9a137abaa6a82e302"
+        );
+        assert_eq!(
+            resp.address_textual,
+            "5upke-tazvi-6ufqc-i3v6r-j4gpu-dpwti-obhal-yb5xj-ue32x-ktkql-rqe".to_string()
+        );
+    }
 }
