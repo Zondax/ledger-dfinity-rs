@@ -36,7 +36,7 @@ const ADDR_LEN: usize = 29;
 const ADDR_TEXT_LEN: usize = 20;
 
 const PREHASH_LEN: usize = 43;
-const SIG_LEN: usize = 65;
+const SIG_LEN: usize = 64;
 
 /// Ledger App
 pub struct DfinityApp {
@@ -70,7 +70,7 @@ pub struct Signature {
     /// Public Key
     pub pre_signature_hash: [u8; PREHASH_LEN],
     /// Signature RSV
-    pub rsv: [u8; 65],
+    pub rs: [u8; SIG_LEN],
 }
 
 impl DfinityApp {
@@ -167,6 +167,7 @@ impl DfinityApp {
         &self,
         path: &BIP44Path,
         message: &[u8],
+        txtype: u8,
     ) -> Result<Signature, LedgerAppError> {
         let serialized_path = path.serialize();
         let start_command = APDUCommand {
@@ -177,9 +178,15 @@ impl DfinityApp {
             data: serialized_path,
         };
 
-        let response =
-            ledger_zondax_generic::send_chunks(&self.apdu_transport, &start_command, message)
-                .await?;
+        let mut combined_blob: Vec<u8> = vec![txtype];
+        combined_blob.extend_from_slice(message);
+
+        let response = ledger_zondax_generic::send_chunks(
+            &self.apdu_transport,
+            &start_command,
+            &combined_blob,
+        )
+        .await?;
 
         if response.data.is_empty() && response.retcode == APDUErrorCodes::NoError as u16 {
             return Err(LedgerAppError::NoSignature);
@@ -192,11 +199,11 @@ impl DfinityApp {
 
         let mut sig: Signature = Signature {
             pre_signature_hash: [0; PREHASH_LEN],
-            rsv: [0; SIG_LEN],
+            rs: [0; SIG_LEN],
         };
         sig.pre_signature_hash
             .copy_from_slice(&response.data[..PREHASH_LEN]);
-        sig.rsv
+        sig.rs
             .copy_from_slice(&response.data[PREHASH_LEN..PREHASH_LEN + SIG_LEN]);
 
         Ok(sig)
