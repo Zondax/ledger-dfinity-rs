@@ -33,6 +33,7 @@ const INS_SIGN: u8 = 0x02;
 
 const PK_LEN: usize = 65;
 const ADDR_LEN: usize = 29;
+const ADDR_TEXT_LEN: usize = 20;
 
 const PREHASH_LEN: usize = 43;
 const SIG_LEN: usize = 65;
@@ -52,13 +53,16 @@ pub enum AppMode {
 }
 
 type PublicKey = [u8; PK_LEN];
+type Address = [u8; ADDR_LEN];
 
 /// Dfinity address (includes pubkey and the corresponding address)
-pub struct Address {
+pub struct DfinityAddress {
     /// Public Key
     pub public_key: PublicKey,
     /// Address
-    pub address: String,
+    pub address: Address,
+    /// Textual representation of address
+    pub address_textual: String,
 }
 
 /// Dfinity Signature
@@ -98,7 +102,7 @@ impl DfinityApp {
         &self,
         path: &BIP44Path,
         require_confirmation: bool,
-    ) -> Result<Address, LedgerAppError> {
+    ) -> Result<DfinityAddress, LedgerAppError> {
         let serialized_path = path.serialize();
         let p1 = if require_confirmation { 1 } else { 0 };
 
@@ -120,20 +124,37 @@ impl DfinityApp {
                     ));
                 }
 
-                if response.data.len() < PK_LEN + ADDR_LEN {
+                if response.data.len() < PK_LEN + ADDR_LEN + ADDR_TEXT_LEN {
                     return Err(LedgerAppError::InvalidPK);
                 }
 
-                let mut address = Address {
+                let mut address = DfinityAddress {
                     public_key: [0; PK_LEN],
-                    address: "".to_string(),
+                    address: [0; ADDR_LEN],
+                    address_textual: "".to_string(),
                 };
 
                 address.public_key.copy_from_slice(&response.data[..PK_LEN]);
-                address.address = str::from_utf8(&response.data[PK_LEN..])
+                address
+                    .address
+                    .copy_from_slice(&response.data[PK_LEN..PK_LEN + ADDR_LEN]);
+                address.address_textual = str::from_utf8(&response.data[PK_LEN + ADDR_LEN..])
                     .map_err(|_e| LedgerAppError::Utf8)?
                     .to_owned();
-
+                address.address_textual = address
+                    .address_textual
+                    .chars()
+                    .enumerate()
+                    .flat_map(|(i, c)| {
+                        if i != 0 && i % 5 == 0 {
+                            Some('-')
+                        } else {
+                            None
+                        }
+                        .into_iter()
+                        .chain(std::iter::once(c))
+                    })
+                    .collect::<String>();
                 Ok(address)
             }
 
