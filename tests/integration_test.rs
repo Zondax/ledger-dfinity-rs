@@ -30,6 +30,9 @@ mod integration_tests {
     use ledger_dfinity::{new_dfinity_app, APDUTransport};
     use zx_bip44::BIP44Path;
 
+    use secp256k1::{Message, PublicKey, Secp256k1, Signature};
+    use sha2::Digest;
+
     fn init_logging() {
         let _ = env_logger::from_env(Env::default().default_filter_or("info"))
             .is_test(true)
@@ -133,6 +136,17 @@ mod integration_tests {
         let resp = req.unwrap();
 
         assert_eq!(hex::encode(resp.pre_signature_hash),"0a69632d72657175657374bf5bae8c2b6be8103a070e6d2240c18788c10a94ba68990f8c7e7acecb8b8c34");
+
+        let pubkey = PublicKey::from_slice(&hex::decode("0410d34980a51af89d3331ad5fa80fe30d8868ad87526460b3b3e15596ee58e812422987d8589ba61098264df5bb9c2d3ff6fe061746b4b31a44ec26636632b835").unwrap()).unwrap();
+
+        let signature = Signature::from_compact(&resp.rs);
+
+        let digest =
+            Message::from_slice(sha2::Sha256::digest(&resp.pre_signature_hash).as_slice()).unwrap();
+
+        assert!(Secp256k1::new()
+            .verify(&digest, &signature.unwrap(), &pubkey)
+            .is_ok());
     }
 
     #[async_test]
@@ -159,5 +173,16 @@ mod integration_tests {
         let resp = req.unwrap();
 
         assert_eq!(hex::encode(resp.pre_signature_hash),"0a69632d72657175657374e9db309ae391d86190768bb57d6d5ab1e29e876a4f8dbc94bd71c198bc4d341b");
+
+        let pubkey = PublicKey::from_slice(&hex::decode("0410d34980a51af89d3331ad5fa80fe30d8868ad87526460b3b3e15596ee58e812422987d8589ba61098264df5bb9c2d3ff6fe061746b4b31a44ec26636632b835").unwrap()).unwrap();
+
+        let signature = Signature::from_compact(&resp.rs);
+
+        let digest =
+            Message::from_slice(sha2::Sha256::digest(&resp.pre_signature_hash).as_slice()).unwrap();
+
+        assert!(Secp256k1::new()
+            .verify(&digest, &signature.unwrap(), &pubkey)
+            .is_ok());
     }
 }
