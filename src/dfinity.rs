@@ -32,7 +32,8 @@ const INS_GET_ADDR: u8 = 0x01;
 const INS_SIGN: u8 = 0x02;
 
 const PK_LEN: usize = 65;
-const ADDR_LEN: usize = 29;
+const ADDR_LEN: usize = 32;
+const PRINCIPAL_LEN: usize = 29;
 const ADDR_TEXT_LEN: usize = 20;
 
 const PREHASH_LEN: usize = 43;
@@ -53,16 +54,19 @@ pub enum AppMode {
 }
 
 type PublicKey = [u8; PK_LEN];
+type Principal = [u8; PRINCIPAL_LEN];
 type Address = [u8; ADDR_LEN];
 
 /// Dfinity address (includes pubkey and the corresponding address)
 pub struct DfinityAddress {
     /// Public Key
     pub public_key: PublicKey,
-    /// Address
+    /// Principal
+    pub principal: Principal,
+    /// Address (default subaccount belonging to Principal)
     pub address: Address,
     /// Textual representation of address
-    pub address_textual: String,
+    pub principal_textual: String,
 }
 
 /// Dfinity Signature
@@ -130,19 +134,24 @@ impl DfinityApp {
 
                 let mut address = DfinityAddress {
                     public_key: [0; PK_LEN],
+                    principal: [0; PRINCIPAL_LEN],
                     address: [0; ADDR_LEN],
-                    address_textual: "".to_string(),
+                    principal_textual: "".to_string(),
                 };
 
                 address.public_key.copy_from_slice(&response.data[..PK_LEN]);
                 address
-                    .address
-                    .copy_from_slice(&response.data[PK_LEN..PK_LEN + ADDR_LEN]);
-                address.address_textual = str::from_utf8(&response.data[PK_LEN + ADDR_LEN..])
-                    .map_err(|_e| LedgerAppError::Utf8)?
-                    .to_owned();
-                address.address_textual = address
-                    .address_textual
+                    .principal
+                    .copy_from_slice(&response.data[PK_LEN..PK_LEN + PRINCIPAL_LEN]);
+                address.address.copy_from_slice(
+                    &response.data[PK_LEN + PRINCIPAL_LEN..PK_LEN + PRINCIPAL_LEN + ADDR_LEN],
+                );
+                address.principal_textual =
+                    str::from_utf8(&response.data[PK_LEN + PRINCIPAL_LEN + ADDR_LEN..])
+                        .map_err(|_e| LedgerAppError::Utf8)?
+                        .to_owned();
+                address.principal_textual = address
+                    .principal_textual
                     .chars()
                     .enumerate()
                     .flat_map(|(i, c)| {
@@ -167,7 +176,6 @@ impl DfinityApp {
         &self,
         path: &BIP44Path,
         message: &[u8],
-        txtype: u8,
     ) -> Result<Signature, LedgerAppError> {
         let serialized_path = path.serialize();
         let start_command = APDUCommand {
@@ -178,15 +186,9 @@ impl DfinityApp {
             data: serialized_path,
         };
 
-        let mut combined_blob: Vec<u8> = vec![txtype];
-        combined_blob.extend_from_slice(message);
-
-        let response = ledger_zondax_generic::send_chunks(
-            &self.apdu_transport,
-            &start_command,
-            &combined_blob,
-        )
-        .await?;
+        let response =
+            ledger_zondax_generic::send_chunks(&self.apdu_transport, &start_command, &message)
+                .await?;
 
         if response.data.is_empty() && response.retcode == APDUErrorCodes::NoError as u16 {
             return Err(LedgerAppError::NoSignature);
