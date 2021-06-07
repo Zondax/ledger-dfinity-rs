@@ -43,12 +43,7 @@ pub use ledger_zondax_generic::LedgerAppError;
 
 pub use dfinity::AppMode;
 
-const CLA_DFINITY: u8 = 0x11;
-
 /// Create a new connection to a dfinity app
 pub fn new_dfinity_app(apdu_transport: APDUTransport) -> DfinityApp {
-    DfinityApp {
-        apdu_transport,
-        cla: CLA_DFINITY,
-    }
+    DfinityApp::new(apdu_transport)
 }

@@ -39,6 +39,9 @@ const ADDR_TEXT_LEN: usize = 20;
 const PREHASH_LEN: usize = 43;
 const SIG_LEN: usize = 64;
 
+///DFINITY CLA CONSTANT
+const CLA_DFINITY: u8 = 0x11;
+
 /// Ledger App
 pub struct DfinityApp {
     pub(crate) apdu_transport: APDUTransport,
@@ -79,10 +82,10 @@ pub struct Signature {
 
 impl DfinityApp {
     /// Connect to the Ledger App
-    pub fn new(apdu_transport: APDUTransport, cla: u8) -> Self {
+    pub fn new(apdu_transport: APDUTransport) -> Self {
         DfinityApp {
             apdu_transport,
-            cla,
+            cla: CLA_DFINITY,
         }
     }
 
